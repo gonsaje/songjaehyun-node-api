@@ -9,6 +9,80 @@ import {
 export class ProductService {
   constructor(private readonly repository: ProductRepository) {}
 
+  private normalizeValue(value: string): string {
+    return value
+        .toLowerCase()
+        .trim()
+        .replace(/[-_]/g, " ")
+        .replace(/\s+/g, " ");
+    }
+  private resolveAliases(value: string): string {
+    const aliases: Record<string, string> = {
+        "audio interface": "audio-interface",
+        "audi interface": "audio-interface",
+        "mic": "microphone",
+        "mics": "microphone",
+        "drum": "drums",
+    };
+
+    const normalized = this.normalizeValue(value);
+    return aliases[normalized] ?? value;
+  }
+  
+  private levenshtein(a: string, b: string): number {
+    const dp = Array.from({ length: a.length + 1 }, () =>
+        Array(b.length + 1).fill(0)
+    );
+
+    for (let i = 0; i <= a.length; i++) dp[i][0] = i;
+    for (let j = 0; j <= b.length; j++) dp[0][j] = j;
+
+    for (let i = 1; i <= a.length; i++) {
+        for (let j = 1; j <= b.length; j++) {
+        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+
+        dp[i][j] = Math.min(
+            dp[i - 1][j] + 1,
+            dp[i][j - 1] + 1,
+            dp[i - 1][j - 1] + cost
+        );
+        }
+    }
+
+    return dp[a.length][b.length];
+  }
+
+  private matchesSearch(product: Product, rawSearch: string): boolean {
+    const search = this.normalizeValue(this.resolveAliases(rawSearch));
+
+    const fields = [
+        this.normalizeValue(product.name),
+        this.normalizeValue(product.brand),
+        this.normalizeValue(product.category),
+    ];
+
+    for (const field of fields) {
+        if (field.includes(search)) {
+            return true;
+        }
+
+        const words = field.split(" ");
+            for (const word of words) {
+            const distance = this.levenshtein(search, word);
+
+            if (distance <= 1) {
+                return true;
+            }
+
+            if (search.length >= 5 && distance <= 2) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+  }
+
   listProducts(query: ProductListQuery): PaginatedProducts {
     const {
       category,
@@ -39,11 +113,7 @@ export class ProductService {
     }
 
     if (search) {
-      const normalizedSearch = search.toLowerCase();
-      results = results.filter((product) =>
-        product.name.toLowerCase().includes(normalizedSearch) ||
-        product.brand.toLowerCase().includes(normalizedSearch)
-      );
+      results = results.filter((product) => this.matchesSearch(product, search));
     }
 
     results = this.sortProducts(results, sortBy, order);
