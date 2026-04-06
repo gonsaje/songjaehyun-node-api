@@ -1,6 +1,6 @@
 export interface AppContext {
   publish: (event: string, payload: any) => void;
-  subscribe: (event: string, handler: (payload: any) => void) => void;
+  subscribe: (eventName: string, handler: (payload: unknown) => void,) => () => void;
 
   logger: {
     info: (msg: string) => void;
