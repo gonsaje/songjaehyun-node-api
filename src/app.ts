@@ -1,25 +1,22 @@
-import Fastify from "fastify";
-import cors from "@fastify/cors";
-import { registerCors } from "./plugins/cors";
+import fastify from "fastify";
 import { registerSwagger } from "./plugins/swagger";
 import { registerProductRoutes } from "./modules/products/product.routes";
+import { registerCors } from "./plugins/cors";
 
 export async function buildApp() {
-  const app = Fastify({
-    logger: true,
-  });
+    const app = fastify({
+        logger: true,
+    });
 
-  await app.register(cors, {
-    origin: ["http://localhost:3000", "http://127.0.0.1:3000"],
-    methods: ["GET", "POST", "PATCH"],
-  });
-  app.register(registerSwagger);
+    await registerCors(app);
 
-  app.get("/health", async () => {
-    return { status: "ok" };
-  });
+    app.register(registerSwagger);
 
-  app.register(registerProductRoutes);
+    app.get("/health", async () => {
+        return { status: "ok" };
+    });
 
-  return app;
+    app.register(registerProductRoutes);
+
+    return app;
 }
