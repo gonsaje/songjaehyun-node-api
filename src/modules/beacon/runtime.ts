@@ -19,28 +19,14 @@ class BeaconRuntime {
 	}
 
 	async start(appId: string): Promise<void> {
-		const entry = this.apps.get(appId);
-
-		if (!entry) {
-			throw new Error(`App "${appId}" is not registered.`);
-		}
-
-		if (entry.state === AppState.RUNNING || entry.state === AppState.STARTING) {
-			throw new Error(`App "${appId}" is already in process.`);
+		const entry = this.getEntry(appId);
+		if (entry.state !== AppState.REGISTERED) {
+			throw new Error(`App "${appId}" is already in process: ${entry.state}`);
 		}
 
 		entry.state = AppState.STARTING;
 
-		const appContext: AppContext = {
-			publish: (eventName, payload) =>
-				this.eventBus.publish(eventName, payload),
-			subscribe: (eventName, handler) =>
-				this.eventBus.subscribe(eventName, handler),
-			logger: {
-				info: (msg) => console.log(`[${appId}] ${msg}`),
-				error: (msg) => console.error(`[${appId}] ${msg}`),
-			},
-		};
+		const appContext = this.createAppContext(appId);
 
 		try {
 			await entry.app.start(appContext);
@@ -52,12 +38,7 @@ class BeaconRuntime {
 	}
 
 	async stop(appId: string) {
-		const entry = this.apps.get(appId);
-
-		if (!entry) {
-			throw new Error(`App "${appId}" is not registered.`);
-		}
-
+		const entry = this.getEntry(appId);
 		if (entry.state !== AppState.RUNNING) {
 			throw new Error(`App "${appId}" is not running.`);
 		}
@@ -71,26 +52,49 @@ class BeaconRuntime {
 			entry.state = AppState.FAILED;
 			throw error;
 		}
+
+		// Reset State
+		entry.state = AppState.REGISTERED;
 	}
 
 	getAppState(appId: string) {
+		const entry = this.getEntry(appId);
+		return entry.state;
+	}
+
+	private createAppContext(appId: string) {
+		const appContext: AppContext = {
+			publish: (eventName, payload) =>
+				this.eventBus.publish(eventName, payload),
+			subscribe: (eventName, handler) =>
+				this.eventBus.subscribe(eventName, handler),
+			logger: {
+				info: (msg) => console.log(`[${appId}] ${msg}`),
+				error: (msg) => console.error(`[${appId}] ${msg}`),
+			},
+		};
+
+		return appContext;
+	}
+
+	getEntry(appId: string) {
 		const entry = this.apps.get(appId);
 		if (!entry) {
 			throw new Error(`App "${appId}" is not registered.`);
 		}	
-
-		return entry.state;
+		
+		return entry;
 	}
 
-	listApps(state=undefined) {
-		const apps: string[] = [];
+	listApps(state = undefined) {
+		const apps: object[] = [];
 		this.apps.forEach((entry) => {
 			if (state !== undefined) {
 				if (state == entry.state) {
-					apps.push(`${entry.app.name}-${entry.app.id}`);
+					apps.push(entry);
 				}
 			} else {
-				apps.push(`${entry.app.name}-${entry.app.id}`);
+				apps.push(entry);
 			}
 		});
 
