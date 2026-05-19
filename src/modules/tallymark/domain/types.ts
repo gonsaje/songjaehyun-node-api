@@ -34,9 +34,22 @@ export interface Fund {
 
 export interface Investor {
   id: string;
-  fund_id: string;
+  fundId: string;
   name: string;
   commitmentAmount: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Transaction {
+  id: string;
+  fundId: string;
+  investorId: string;
+  transactionType: TransactionType;
+  reference: string;
+  amount: string;
+  expectedAmount: string;
   metadata: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
