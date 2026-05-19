@@ -31,3 +31,13 @@ export interface Fund {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface Investor {
+  id: string;
+  fund_id: string;
+  name: string;
+  commitmentAmount: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
