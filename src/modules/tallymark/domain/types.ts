@@ -67,3 +67,20 @@ export interface ReconciliationRun {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface ReviewIssue {
+  id: string;
+  reconciliationRunId: string;
+  fundId: string;
+  transactionId: string;
+  investorId: string;
+  issueType: ReviewIssueType;
+  severity: ReviewIssueSeverity;
+  status: ReviewIssueStatus;
+  title: string;
+  description: string;
+  aiSummary: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
