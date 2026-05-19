@@ -9,6 +9,7 @@ export class FundRepository {
                 name,
                 strategy,
                 vintage_year as "vintageYear",
+                currency,
                 metadata,
                 created_at as "createdAt",
                 updated_at as "updatedAt"
@@ -27,6 +28,7 @@ export class FundRepository {
                 name,
                 strategy,
                 vintage_year as "vintageYear",
+                currency,
                 metadata,
                 created_at as "createdAt",
                 updated_at as "updatedAt"

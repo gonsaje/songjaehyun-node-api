@@ -13,6 +13,8 @@ export class TransactionRepository {
                     reference,
                     amount,
                     expected_amount as "expectedAmount",
+                    transaction_date as "transactionDate",
+                    settlement_date as "settlementDate",
                     metadata,
                     created_at as "createdAt",
                     updated_at as "updatedAt"
@@ -35,6 +37,8 @@ export class TransactionRepository {
                     reference,
                     amount,
                     expected_amount as "expectedAmount",
+                    transaction_date as "transactionDate",
+                    settlement_date as "settlementDate",
                     metadata,
                     created_at as "createdAt",
                     updated_at as "updatedAt"
@@ -57,6 +61,8 @@ export class TransactionRepository {
                     reference,
                     amount,
                     expected_amount as "expectedAmount",
+                    transaction_date as "transactionDate",
+                    settlement_date as "settlementDate",
                     metadata,
                     created_at as "createdAt",
                     updated_at as "updatedAt"

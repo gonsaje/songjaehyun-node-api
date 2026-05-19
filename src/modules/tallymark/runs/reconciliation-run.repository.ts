@@ -39,7 +39,7 @@ export class ReconciliationRunRepository {
             created_at as "createdAt",
             updated_at as "updatedAt"
         from reconciliation_runs
-        where fund_id = $1
+        where id = $1
         `,
       [id],
     );

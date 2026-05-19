@@ -11,7 +11,7 @@ export async function registerInvestorRoutes(app: FastifyInstance) {
 
   app.get("/api/tallymark/investors/:investorId", async (request, reply) => {
     const params = request.params as { investorId: string };
-    const investor = await investorRepository.listInvestorsByFundId(params.investorId);
+    const investor = await investorRepository.getInvestorById(params.investorId);
 
     if (!investor) {
       return reply.status(404).send({
@@ -21,5 +21,7 @@ export async function registerInvestorRoutes(app: FastifyInstance) {
         },
       });
     }
+
+    return investor;
   });
 }

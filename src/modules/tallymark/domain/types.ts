@@ -21,6 +21,8 @@ export type ReviewIssueType =
   | "amount_exceeds_remaining_commitment"
   | "unknown_transaction_type";
 
+export type IssueEventType = "created" | "ai_summary_generated" | "status_changed" | "note_added";
+
 export interface Fund {
   id: string;
   name: string;
@@ -45,11 +47,13 @@ export interface Investor {
 export interface Transaction {
   id: string;
   fundId: string;
-  investorId: string;
+  investorId: string | null;
   transactionType: TransactionType;
   reference: string;
   amount: string;
-  expectedAmount: string;
+  expectedAmount: string | null;
+  transactionDate: string;
+  settlementDate: string | null;
   metadata: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
@@ -59,10 +63,10 @@ export interface ReconciliationRun {
   id: string;
   fundId: string;
   status: ReconciliationRunStatus;
-  startedAt: string;
-  completedAt: string;
-  aiSummary: string;
-  errorMessage: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  aiSummary: string | null;
+  errorMessage: string | null;
   metadata: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
@@ -72,14 +76,14 @@ export interface ReviewIssue {
   id: string;
   reconciliationRunId: string;
   fundId: string;
-  transactionId: string;
-  investorId: string;
+  transactionId: string | null;
+  investorId: string | null;
   issueType: ReviewIssueType;
   severity: ReviewIssueSeverity;
   status: ReviewIssueStatus;
   title: string;
   description: string;
-  aiSummary: string;
+  aiSummary: string | null;
   metadata: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
@@ -88,10 +92,10 @@ export interface ReviewIssue {
 export interface IssueEvent {
   id: string;
   reviewIssueId: string;
-  eventType: string;
-  fromStatus: string;
-  toStatus: string;
-  note: string;
+  eventType: IssueEventType;
+  fromStatus: ReviewIssueStatus | null;
+  toStatus: ReviewIssueStatus | null;
+  note: string | null;
   metadata: Record<string, unknown>;
   createdAt: string;
 }
