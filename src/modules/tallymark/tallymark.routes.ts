@@ -4,6 +4,7 @@ import { registerInvestorRoutes } from "./investors/investor.routes";
 import { registerTransactionRoutes } from "./transactions/transaction.routes";
 import { registerReconciliationRunRoutes } from "./runs/reconciliation-run.routes";
 import { registerReviewIssueRoutes } from "./issues/review-issue.routes";
+import { registerIssueEventRoutes } from "./events/issue-events.routes";
 
 export async function registerTallymarkRoutes(app: FastifyInstance) {
   app.register(registerFundRoutes);
@@ -11,4 +12,5 @@ export async function registerTallymarkRoutes(app: FastifyInstance) {
   app.register(registerTransactionRoutes);
   app.register(registerReconciliationRunRoutes);
   app.register(registerReviewIssueRoutes);
+  app.register(registerIssueEventRoutes);
 }

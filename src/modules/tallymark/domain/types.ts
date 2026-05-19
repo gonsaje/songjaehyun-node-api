@@ -84,3 +84,14 @@ export interface ReviewIssue {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface IssueEvent {
+  id: string;
+  reviewIssueId: string;
+  eventType: string;
+  fromStatus: string;
+  toStatus: string;
+  note: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+}
