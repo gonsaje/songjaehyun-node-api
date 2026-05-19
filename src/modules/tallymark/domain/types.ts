@@ -54,3 +54,16 @@ export interface Transaction {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface ReconciliationRun {
+  id: string;
+  fundId: string;
+  status: ReconciliationRunStatus;
+  startedAt: string;
+  completedAt: string;
+  aiSummary: string;
+  errorMessage: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
