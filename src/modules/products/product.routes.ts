@@ -1,11 +1,7 @@
 import { FastifyInstance } from "fastify";
 import { ProductRepository } from "./product.repository";
 import { ProductService } from "./product.service";
-import {
-  CreateProductInput,
-  ProductCategory,
-  ProductCondition,
-} from "./product.types";
+import { CreateProductInput, ProductCategory, ProductCondition } from "./product.types";
 
 const productRepository = new ProductRepository();
 const productService = new ProductService(productRepository);
@@ -33,8 +29,7 @@ export async function registerProductRoutes(app: FastifyInstance) {
     const brand = query.brand;
     const condition = query.condition as ProductCondition | undefined;
     const search = query.search;
-    const sortBy =
-      (query.sortBy as "name" | "price" | "rating" | undefined) ?? "name";
+    const sortBy = (query.sortBy as "name" | "price" | "rating" | undefined) ?? "name";
     const order = (query.order as "asc" | "desc" | undefined) ?? "asc";
 
     if (category && !allowedCategories.includes(category)) {
@@ -160,11 +155,7 @@ export async function registerProductRoutes(app: FastifyInstance) {
       });
     }
 
-    if (
-      typeof body.rating !== "number" ||
-      body.rating < 0 ||
-      body.rating > 5
-    ) {
+    if (typeof body.rating !== "number" || body.rating < 0 || body.rating > 5) {
       return reply.status(400).send({
         error: {
           code: "INVALID_RATING",

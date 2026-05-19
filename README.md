@@ -229,17 +229,17 @@ Tallymark does not attempt to build:
 
 # Tech Stack
 
-| Technology        | Purpose                                      |
-| ----------------- | -------------------------------------------- |
-| Node.js           | Runtime environment                          |
-| TypeScript        | Type-safe backend development                |
-| Fastify           | High-performance API framework               |
-| Zod               | Request validation schemas                   |
-| Swagger / OpenAPI | API documentation                            |
-| UUID              | Resource identifiers                         |
-| Supabase Postgres | Planned persistence for Tallymark workflows  |
+| Technology        | Purpose                                        |
+| ----------------- | ---------------------------------------------- |
+| Node.js           | Runtime environment                            |
+| TypeScript        | Type-safe backend development                  |
+| Fastify           | High-performance API framework                 |
+| Zod               | Request validation schemas                     |
+| Swagger / OpenAPI | API documentation                              |
+| UUID              | Resource identifiers                           |
+| Supabase Postgres | Planned persistence for Tallymark workflows    |
 | Trigger.dev       | Planned async reconciliation job orchestration |
-| AI API            | Planned summary generation for review issues |
+| AI API            | Planned summary generation for review issues   |
 
 ---
 
@@ -399,7 +399,7 @@ Response
 
 ```json
 {
-	"status": "ok"
+  "status": "ok"
 }
 ```
 
@@ -458,20 +458,20 @@ Example response:
 
 ```json
 {
-	"items": [
-		{
-			"id": "p_102",
-			"name": "Wireless Mechanical Keyboard",
-			"category": "keyboard",
-			"price": 139.99,
-			"inventory": 12,
-			"rating": 4.6
-		}
-	],
-	"page": 1,
-	"pageSize": 5,
-	"total": 18,
-	"totalPages": 4
+  "items": [
+    {
+      "id": "p_102",
+      "name": "Wireless Mechanical Keyboard",
+      "category": "keyboard",
+      "price": 139.99,
+      "inventory": 12,
+      "rating": 4.6
+    }
+  ],
+  "page": 1,
+  "pageSize": 5,
+  "total": 18,
+  "totalPages": 4
 }
 ```
 
