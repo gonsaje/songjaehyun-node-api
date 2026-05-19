@@ -2,6 +2,7 @@ import { db } from "./db/postgres";
 import fastify from "fastify";
 import { registerSwagger } from "./plugins/swagger";
 import { registerProductRoutes } from "./modules/products/product.routes";
+import { registerTallymarkRoutes } from "./modules/tallymark/tallymark.routes";
 import { registerCors } from "./plugins/cors";
 
 export async function buildApp() {
@@ -27,6 +28,7 @@ export async function buildApp() {
   });
 
   app.register(registerProductRoutes);
+  app.register(registerTallymarkRoutes);
 
   return app;
 }

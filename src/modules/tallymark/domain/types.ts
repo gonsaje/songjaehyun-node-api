@@ -1,19 +1,8 @@
-export type ReconciliationRunStatus =
-  | "queued"
-  | "processing"
-  | "completed"
-  | "failed";
+export type ReconciliationRunStatus = "queued" | "processing" | "completed" | "failed";
 
-export type ReviewIssueStatus =
-  | "open"
-  | "resolved"
-  | "dismissed";
+export type ReviewIssueStatus = "open" | "resolved" | "dismissed";
 
-export type ReviewIssueSeverity =
-  | "low"
-  | "medium"
-  | "high"
-  | "critical";
+export type ReviewIssueSeverity = "low" | "medium" | "high" | "critical";
 
 export type TransactionType =
   | "capital_call"
@@ -31,3 +20,14 @@ export type ReviewIssueType =
   | "distribution_without_investor"
   | "amount_exceeds_remaining_commitment"
   | "unknown_transaction_type";
+
+export interface Fund {
+  id: string;
+  name: string;
+  strategy: string;
+  vintageYear: number | null;
+  currency: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
