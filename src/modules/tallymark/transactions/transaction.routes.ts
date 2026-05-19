@@ -13,4 +13,20 @@ export async function registerTransactionRoutes(app: FastifyInstance) {
     const params = request.params as { investorId: string };
     return transactionRepository.listTransactionsByInvestorId(params.investorId);
   });
+
+  app.get("/api/tallymark/transactions/:transactionId", async (request, reply) => {
+    const params = request.params as { transactionId: string };
+    const transaction = await transactionRepository.getTransactionById(params.transactionId);
+
+    if (!transaction) {
+      return reply.status(404).send({
+        error: {
+          code: "TRANSACTION_NOT_FOUND",
+          message: `Transaction with id ${params.transactionId} was not found.`,
+        },
+      });
+    }
+
+    return transaction;
+  });
 }

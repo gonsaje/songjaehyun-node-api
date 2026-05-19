@@ -106,7 +106,7 @@ export class ReviewIssueRepository {
     return result.rows;
   }
 
-  async getReviewIssueById(id: string): Promise<ReviewIssue[]> {
+  async getReviewIssueById(id: string): Promise<ReviewIssue | undefined> {
     const result = await db.query(
       `
         select

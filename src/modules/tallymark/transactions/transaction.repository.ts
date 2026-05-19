@@ -45,4 +45,26 @@ export class TransactionRepository {
     );
     return result.rows;
   }
+
+  async getTransactionById(transactionId: string): Promise<Transaction | undefined> {
+    const result = await db.query(
+      `
+                select
+                    id,
+                    fund_id as "fundId",
+                    investor_id as "investorId",
+                    transaction_type as "transactionType",
+                    reference,
+                    amount,
+                    expected_amount as "expectedAmount",
+                    metadata,
+                    created_at as "createdAt",
+                    updated_at as "updatedAt"
+                from transactions
+                where id = $1
+            `,
+      [transactionId],
+    );
+    return result.rows[0];
+  }
 }

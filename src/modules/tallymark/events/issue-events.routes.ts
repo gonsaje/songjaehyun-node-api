@@ -17,7 +17,7 @@ export async function registerIssueEventRoutes(app: FastifyInstance) {
       return reply.status(404).send({
         error: {
           code: "EVENT_NOT_FOUND",
-          message: `Issue Event with id ${params.issueEventId} was not found`,
+          message: `Issue Event with id ${params.issueEventId} was not found.`,
         },
       });
     }

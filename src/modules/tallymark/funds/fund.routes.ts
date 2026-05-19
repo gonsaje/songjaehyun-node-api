@@ -16,7 +16,7 @@ export async function registerFundRoutes(app: FastifyInstance) {
       return reply.status(404).send({
         error: {
           code: "FUND_NOT_FOUND",
-          message: `Fund with id ${params.fundId} was not found`,
+          message: `Fund with id ${params.fundId} was not found.`,
         },
       });
     }

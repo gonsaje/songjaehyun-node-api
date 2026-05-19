@@ -23,4 +23,26 @@ export class ReconciliationRunRepository {
     );
     return result.rows;
   }
+
+  async getReconciliationRunById(id: string): Promise<ReconciliationRun | undefined> {
+    const result = await db.query(
+      `
+        select
+            id,
+            fund_id as "fundId",
+            status,
+            started_at as "startedAt",
+            completed_at as "completedAt",
+            ai_summary as "aiSummary",
+            error_message as "errorMessage",
+            metadata,
+            created_at as "createdAt",
+            updated_at as "updatedAt"
+        from reconciliation_runs
+        where fund_id = $1
+        `,
+      [id],
+    );
+    return result.rows[0];
+  }
 }
