@@ -99,3 +99,8 @@ export interface IssueEvent {
   metadata: Record<string, unknown>;
   createdAt: string;
 }
+
+export interface UpdateReviewIssueStatusInput {
+  status: "resolved" | "dismissed";
+  note: string;
+}
