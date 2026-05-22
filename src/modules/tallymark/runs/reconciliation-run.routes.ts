@@ -1,7 +1,14 @@
 import { FastifyInstance } from "fastify";
+import { FundRepository } from "../funds/fund.repository";
 import { ReconciliationRunRepository } from "./reconciliation-run.repository";
+import { ReconciliationRunService } from "./reconciliation-run.service";
 
+const fundRepository = new FundRepository();
 const reconciliationRunRepository = new ReconciliationRunRepository();
+const reconciliationRunService = new ReconciliationRunService(
+  reconciliationRunRepository,
+  fundRepository,
+);
 
 export async function registerReconciliationRunRoutes(app: FastifyInstance) {
   app.get("/api/tallymark/funds/:fundId/reconciliation-runs", async (request, reply) => {
@@ -25,5 +32,22 @@ export async function registerReconciliationRunRoutes(app: FastifyInstance) {
     }
 
     return reconciliationRun;
+  });
+
+  app.post("/api/tallymark/funds/:fundId/reconciliation-runs", async (request, reply) => {
+    const params = request.params as { fundId: string };
+
+    const run = await reconciliationRunService.startRun(params.fundId);
+
+    if (!run) {
+      return reply.status(404).send({
+        error: {
+          code: "FUND_NOT_FOUND",
+          message: `Fund with id ${params.fundId} was not found.`,
+        },
+      });
+    }
+
+    return reply.status(201).send(run);
   });
 }
