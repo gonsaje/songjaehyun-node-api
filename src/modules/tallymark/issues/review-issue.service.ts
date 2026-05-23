@@ -1,6 +1,6 @@
-import { ReviewIssue, UpdateReviewIssueStatusInput } from "../domain/types";
-import { ReviewIssueRepository } from "./review-issue.repository";
-import { IssueEventRepository } from "../events/issue-events.repository";
+import type { IssueEventRepository } from "../events/issue-events.repository";
+import type { ReviewIssue, UpdateReviewIssueStatusInput } from "../domain/types";
+import type { ReviewIssueRepository } from "./review-issue.repository";
 
 export class ReviewIssueService {
   constructor(

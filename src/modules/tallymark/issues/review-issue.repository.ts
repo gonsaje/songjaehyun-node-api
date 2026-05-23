@@ -1,5 +1,5 @@
 import { db } from "../../../db/postgres";
-import { ReviewIssue, ReviewIssueStatus } from "../domain/types";
+import { CreateReviewIssueInput, ReviewIssue, ReviewIssueStatus } from "../domain/types";
 
 const REVIEW_ISSUE_COLUMNS = `
   id,
@@ -100,6 +100,56 @@ export class ReviewIssueRepository {
           ${REVIEW_ISSUE_COLUMNS}
       `,
       [id, status],
+    );
+
+    return result.rows[0];
+  }
+
+  async createReviewIssue(input: CreateReviewIssueInput): Promise<ReviewIssue> {
+    const result = await db.query(
+      `
+        insert into review_issues (
+          reconciliation_run_id,
+          fund_id,
+          transaction_id,
+          investor_id,
+          issue_type,
+          severity,
+          status,
+          title,
+          description,
+          ai_summary,
+          metadata
+        )
+        values (
+          $1,
+          $2,
+          $3,
+          $4,
+          $5,
+          $6,
+          $7,
+          $8,
+          $9,
+          $10,
+          $11
+        )
+        returning
+          ${REVIEW_ISSUE_COLUMNS}
+      `,
+      [
+        input.reconciliationRunId,
+        input.fundId,
+        input.transactionId,
+        input.investorId,
+        input.issueType,
+        input.severity,
+        input.status,
+        input.title,
+        input.description,
+        input.aiSummary,
+        input.metadata,
+      ],
     );
 
     return result.rows[0];

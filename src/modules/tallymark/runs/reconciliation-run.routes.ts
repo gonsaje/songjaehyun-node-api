@@ -2,12 +2,18 @@ import { FastifyInstance } from "fastify";
 import { FundRepository } from "../funds/fund.repository";
 import { ReconciliationRunRepository } from "./reconciliation-run.repository";
 import { ReconciliationRunService } from "./reconciliation-run.service";
+import { TransactionRepository } from "../transactions/transaction.repository";
+import { ReviewIssueRepository } from "../issues/review-issue.repository";
 
 const fundRepository = new FundRepository();
 const reconciliationRunRepository = new ReconciliationRunRepository();
+const transactionRepository = new TransactionRepository();
+const reviewIssueRepository = new ReviewIssueRepository();
 const reconciliationRunService = new ReconciliationRunService(
   reconciliationRunRepository,
   fundRepository,
+  transactionRepository,
+  reviewIssueRepository,
 );
 
 export async function registerReconciliationRunRoutes(app: FastifyInstance) {

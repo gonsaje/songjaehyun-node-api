@@ -104,3 +104,17 @@ export interface UpdateReviewIssueStatusInput {
   status: "resolved" | "dismissed";
   note: string;
 }
+
+export interface CreateReviewIssueInput {
+  reconciliationRunId: string;
+  fundId: string;
+  transactionId: string | null;
+  investorId: string | null;
+  issueType: ReviewIssueType;
+  severity: ReviewIssueSeverity;
+  status: ReviewIssueStatus;
+  title: string;
+  description: string;
+  aiSummary?: string | null;
+  metadata: Record<string, unknown>;
+}
