@@ -1,8 +1,9 @@
 import type { ReconciliationRun } from "../domain/types";
 import type { ReconciliationRunRepository } from "./reconciliation-run.repository";
 import type { FundRepository } from "../funds/fund.repository";
-import { TransactionRepository } from "../transactions/transaction.repository";
-import { ReviewIssueRepository } from "../issues/review-issue.repository";
+import type { TransactionRepository } from "../transactions/transaction.repository";
+import type { ReviewIssueRepository } from "../issues/review-issue.repository";
+import { findDuplicateTransactionReferenceIssues } from "../workflows/reconciliation/checks/duplicate-transaction-reference.check";
 import { findMissingSettlementDateIssues } from "../workflows/reconciliation/checks/missing-settlement-date.check";
 
 export class ReconciliationRunService {
@@ -24,7 +25,10 @@ export class ReconciliationRunService {
 
     const transactions = await this.transactionRepository.listTransactionsByFundId(fundId);
 
-    const issueInputs = findMissingSettlementDateIssues(run.id, transactions);
+    const issueInputs = [
+      ...findMissingSettlementDateIssues(run.id, transactions),
+      ...findDuplicateTransactionReferenceIssues(run.id, transactions),
+    ];
 
     await Promise.all(
       issueInputs.map((issueInput) => this.reviewIssueRepository.createReviewIssue(issueInput)),

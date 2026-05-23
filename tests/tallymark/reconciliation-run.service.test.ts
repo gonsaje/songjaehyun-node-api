@@ -51,6 +51,36 @@ const transactionWithoutSettlementDate: Transaction = {
   updatedAt: "2026-05-22T00:00:00.000Z",
 };
 
+const duplicateReferenceTransactionA: Transaction = {
+  id: "transaction-2",
+  fundId: "fund-1",
+  investorId: "investor-1",
+  transactionType: "capital_call",
+  reference: "NS-CC-2024-DUP-007",
+  amount: "180000.00",
+  expectedAmount: "180000.00",
+  transactionDate: "2024-02-01",
+  settlementDate: "2024-02-05",
+  metadata: {},
+  createdAt: "2026-05-22T00:00:00.000Z",
+  updatedAt: "2026-05-22T00:00:00.000Z",
+};
+
+const duplicateReferenceTransactionB: Transaction = {
+  id: "transaction-3",
+  fundId: "fund-1",
+  investorId: "investor-2",
+  transactionType: "capital_call",
+  reference: "NS-CC-2024-DUP-007",
+  amount: "95000.00",
+  expectedAmount: "95000.00",
+  transactionDate: "2024-02-01",
+  settlementDate: "2024-02-05",
+  metadata: {},
+  createdAt: "2026-05-22T00:00:00.000Z",
+  updatedAt: "2026-05-22T00:00:00.000Z",
+};
+
 function buildService(existingFund: Fund | undefined) {
   const createdRunFundIds: string[] = [];
   const completedRuns: Array<{ runId: string; aiSummary: string }> = [];
@@ -81,7 +111,11 @@ function buildService(existingFund: Fund | undefined) {
 
   const transactionRepository = {
     async listTransactionsByFundId() {
-      return [transactionWithoutSettlementDate];
+      return [
+        transactionWithoutSettlementDate,
+        duplicateReferenceTransactionA,
+        duplicateReferenceTransactionB,
+      ];
     },
   } as unknown as TransactionRepository;
 
@@ -133,9 +167,11 @@ describe("ReconciliationRunService", () => {
 
     assert.equal(run?.status, "completed");
     assert.deepEqual(createdRunFundIds, ["fund-1"]);
-    assert.equal(createdReviewIssues.length, 1);
+    assert.equal(createdReviewIssues.length, 2);
     assert.equal(createdReviewIssues[0].issueType, "missing_settlement_date");
     assert.equal(createdReviewIssues[0].transactionId, "transaction-1");
+    assert.equal(createdReviewIssues[1].issueType, "duplicate_transaction_reference");
+    assert.equal(createdReviewIssues[1].transactionId, "transaction-2");
     assert.deepEqual(completedRuns, [
       {
         runId: "run-1",
