@@ -3,6 +3,7 @@ import type { ReconciliationRunRepository } from "./reconciliation-run.repositor
 import type { FundRepository } from "../funds/fund.repository";
 import type { TransactionRepository } from "../transactions/transaction.repository";
 import type { ReviewIssueRepository } from "../issues/review-issue.repository";
+import { findCapitalCallVarianceIssues } from "../workflows/reconciliation/checks/capital-call-variance.check";
 import { findDuplicateTransactionReferenceIssues } from "../workflows/reconciliation/checks/duplicate-transaction-reference.check";
 import { findMissingSettlementDateIssues } from "../workflows/reconciliation/checks/missing-settlement-date.check";
 
@@ -28,6 +29,7 @@ export class ReconciliationRunService {
     const issueInputs = [
       ...findMissingSettlementDateIssues(run.id, transactions),
       ...findDuplicateTransactionReferenceIssues(run.id, transactions),
+      ...findCapitalCallVarianceIssues(run.id, transactions),
     ];
 
     await Promise.all(

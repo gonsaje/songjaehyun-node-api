@@ -81,6 +81,36 @@ const duplicateReferenceTransactionB: Transaction = {
   updatedAt: "2026-05-22T00:00:00.000Z",
 };
 
+const underpaymentTransaction: Transaction = {
+  id: "transaction-4",
+  fundId: "fund-1",
+  investorId: "investor-2",
+  transactionType: "capital_call",
+  reference: "NS-CC-2024-UNDER-011",
+  amount: "200000.00",
+  expectedAmount: "250000.00",
+  transactionDate: "2024-03-01",
+  settlementDate: "2024-03-05",
+  metadata: {},
+  createdAt: "2026-05-22T00:00:00.000Z",
+  updatedAt: "2026-05-22T00:00:00.000Z",
+};
+
+const overpaymentTransaction: Transaction = {
+  id: "transaction-5",
+  fundId: "fund-1",
+  investorId: "investor-3",
+  transactionType: "capital_call",
+  reference: "NS-CC-2024-OVER-014",
+  amount: "125000.00",
+  expectedAmount: "100000.00",
+  transactionDate: "2024-03-01",
+  settlementDate: "2024-03-05",
+  metadata: {},
+  createdAt: "2026-05-22T00:00:00.000Z",
+  updatedAt: "2026-05-22T00:00:00.000Z",
+};
+
 function buildService(existingFund: Fund | undefined) {
   const createdRunFundIds: string[] = [];
   const completedRuns: Array<{ runId: string; aiSummary: string }> = [];
@@ -115,6 +145,8 @@ function buildService(existingFund: Fund | undefined) {
         transactionWithoutSettlementDate,
         duplicateReferenceTransactionA,
         duplicateReferenceTransactionB,
+        underpaymentTransaction,
+        overpaymentTransaction,
       ];
     },
   } as unknown as TransactionRepository;
@@ -167,11 +199,15 @@ describe("ReconciliationRunService", () => {
 
     assert.equal(run?.status, "completed");
     assert.deepEqual(createdRunFundIds, ["fund-1"]);
-    assert.equal(createdReviewIssues.length, 2);
+    assert.equal(createdReviewIssues.length, 4);
     assert.equal(createdReviewIssues[0].issueType, "missing_settlement_date");
     assert.equal(createdReviewIssues[0].transactionId, "transaction-1");
     assert.equal(createdReviewIssues[1].issueType, "duplicate_transaction_reference");
     assert.equal(createdReviewIssues[1].transactionId, "transaction-2");
+    assert.equal(createdReviewIssues[2].issueType, "capital_call_underpayment");
+    assert.equal(createdReviewIssues[2].transactionId, "transaction-4");
+    assert.equal(createdReviewIssues[3].issueType, "capital_call_overpayment");
+    assert.equal(createdReviewIssues[3].transactionId, "transaction-5");
     assert.deepEqual(completedRuns, [
       {
         runId: "run-1",
