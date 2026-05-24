@@ -12,7 +12,7 @@ export async function buildApp() {
 
   await registerCors(app);
 
-  app.register(registerSwagger);
+  await registerSwagger(app);
 
   app.get("/health", async () => {
     return { status: "ok" };
