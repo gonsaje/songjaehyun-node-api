@@ -4,16 +4,19 @@ import { ReconciliationRunRepository } from "./reconciliation-run.repository";
 import { ReconciliationRunService } from "./reconciliation-run.service";
 import { TransactionRepository } from "../transactions/transaction.repository";
 import { ReviewIssueRepository } from "../issues/review-issue.repository";
+import { OpenAiSummaryService } from "../ai/openai-summary.service";
 
 const fundRepository = new FundRepository();
 const reconciliationRunRepository = new ReconciliationRunRepository();
 const transactionRepository = new TransactionRepository();
 const reviewIssueRepository = new ReviewIssueRepository();
+const aiSummaryService = new OpenAiSummaryService();
 const reconciliationRunService = new ReconciliationRunService(
   reconciliationRunRepository,
   fundRepository,
   transactionRepository,
   reviewIssueRepository,
+  aiSummaryService,
 );
 
 export async function registerReconciliationRunRoutes(app: FastifyInstance) {

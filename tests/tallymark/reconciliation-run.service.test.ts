@@ -6,6 +6,7 @@ import type {
   ReviewIssue,
   Transaction,
 } from "../../src/modules/tallymark/domain/types";
+import type { AiSummaryService } from "../../src/modules/tallymark/ai/ai-summary.types";
 import type { FundRepository } from "../../src/modules/tallymark/funds/fund.repository";
 import type { ReviewIssueRepository } from "../../src/modules/tallymark/issues/review-issue.repository";
 import type { ReconciliationRunRepository } from "../../src/modules/tallymark/runs/reconciliation-run.repository";
@@ -119,6 +120,7 @@ function buildService(
   const completedRuns: Array<{ runId: string; aiSummary: string }> = [];
   const failedRuns: Array<{ runId: string; errorMessage: string }> = [];
   const createdReviewIssues: ReviewIssue[] = [];
+  const summaryRequests: Array<{ fundName: string; runId: string; issues: ReviewIssue[] }> = [];
 
   const fundRepository = {
     async getFundById() {
@@ -196,23 +198,37 @@ function buildService(
     },
   } as unknown as ReviewIssueRepository;
 
+  const aiSummaryService = {
+    async summarizeReconciliationRun(input: {
+      fundName: string;
+      runId: string;
+      issues: ReviewIssue[];
+    }) {
+      summaryRequests.push(input);
+      return `AI summary for ${input.issues.length} issue(s).`;
+    },
+  } as unknown as AiSummaryService;
+
   return {
     completedRuns,
     createdReviewIssues,
     createdRunFundIds,
     failedRuns,
+    summaryRequests,
     service: new ReconciliationRunService(
       reconciliationRunRepository,
       fundRepository,
       transactionRepository,
       reviewIssueRepository,
+      aiSummaryService,
     ),
   };
 }
 
 describe("ReconciliationRunService", () => {
   it("creates and completes a reconciliation run for an existing fund", async () => {
-    const { completedRuns, createdReviewIssues, createdRunFundIds, service } = buildService(fund);
+    const { completedRuns, createdReviewIssues, createdRunFundIds, service, summaryRequests } =
+      buildService(fund);
 
     const run = await service.startRun("fund-1");
 
@@ -231,9 +247,21 @@ describe("ReconciliationRunService", () => {
     assert.deepEqual(completedRuns, [
       {
         runId: "run-1",
-        aiSummary: "Initial reconciliation run completed. Deterministic checks will be added next.",
+        aiSummary: "AI summary for 4 issue(s).",
       },
     ]);
+    assert.equal(summaryRequests.length, 1);
+    assert.equal(summaryRequests[0].fundName, "Northstar Private Markets Fund I");
+    assert.equal(summaryRequests[0].runId, "run-1");
+    assert.deepEqual(
+      summaryRequests[0].issues.map((issue) => issue.issueType),
+      [
+        "duplicate_transaction_reference",
+        "missing_settlement_date",
+        "capital_call_underpayment",
+        "capital_call_overpayment",
+      ],
+    );
   });
 
   it("does not create a run for a missing fund", async () => {
