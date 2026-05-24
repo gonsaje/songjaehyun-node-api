@@ -111,9 +111,13 @@ const overpaymentTransaction: Transaction = {
   updatedAt: "2026-05-22T00:00:00.000Z",
 };
 
-function buildService(existingFund: Fund | undefined) {
+function buildService(
+  existingFund: Fund | undefined,
+  options: { failIssueCreation?: boolean } = {},
+) {
   const createdRunFundIds: string[] = [];
   const completedRuns: Array<{ runId: string; aiSummary: string }> = [];
+  const failedRuns: Array<{ runId: string; errorMessage: string }> = [];
   const createdReviewIssues: ReviewIssue[] = [];
 
   const fundRepository = {
@@ -135,6 +139,16 @@ function buildService(existingFund: Fund | undefined) {
         status: "completed",
         completedAt: "2026-05-22T00:01:00.000Z",
         aiSummary,
+      } satisfies ReconciliationRun;
+    },
+    async markRunFailed(runId: string, errorMessage: string) {
+      failedRuns.push({ runId, errorMessage });
+
+      return {
+        ...processingRun,
+        status: "failed",
+        completedAt: "2026-05-22T00:01:00.000Z",
+        errorMessage,
       } satisfies ReconciliationRun;
     },
   } as unknown as ReconciliationRunRepository;
@@ -165,6 +179,10 @@ function buildService(existingFund: Fund | undefined) {
       aiSummary?: string | null;
       metadata: Record<string, unknown>;
     }) {
+      if (options.failIssueCreation) {
+        throw new Error("issue insert failed");
+      }
+
       const issue: ReviewIssue = {
         id: `issue-${createdReviewIssues.length + 1}`,
         ...input,
@@ -182,6 +200,7 @@ function buildService(existingFund: Fund | undefined) {
     completedRuns,
     createdReviewIssues,
     createdRunFundIds,
+    failedRuns,
     service: new ReconciliationRunService(
       reconciliationRunRepository,
       fundRepository,
@@ -200,14 +219,15 @@ describe("ReconciliationRunService", () => {
     assert.equal(run?.status, "completed");
     assert.deepEqual(createdRunFundIds, ["fund-1"]);
     assert.equal(createdReviewIssues.length, 4);
-    assert.equal(createdReviewIssues[0].issueType, "missing_settlement_date");
-    assert.equal(createdReviewIssues[0].transactionId, "transaction-1");
-    assert.equal(createdReviewIssues[1].issueType, "duplicate_transaction_reference");
-    assert.equal(createdReviewIssues[1].transactionId, "transaction-2");
-    assert.equal(createdReviewIssues[2].issueType, "capital_call_underpayment");
-    assert.equal(createdReviewIssues[2].transactionId, "transaction-4");
-    assert.equal(createdReviewIssues[3].issueType, "capital_call_overpayment");
-    assert.equal(createdReviewIssues[3].transactionId, "transaction-5");
+    assert.deepEqual(
+      createdReviewIssues.map((issue) => [issue.issueType, issue.transactionId]),
+      [
+        ["duplicate_transaction_reference", "transaction-2"],
+        ["missing_settlement_date", "transaction-1"],
+        ["capital_call_underpayment", "transaction-4"],
+        ["capital_call_overpayment", "transaction-5"],
+      ],
+    );
     assert.deepEqual(completedRuns, [
       {
         runId: "run-1",
@@ -226,5 +246,23 @@ describe("ReconciliationRunService", () => {
     assert.deepEqual(createdRunFundIds, []);
     assert.deepEqual(createdReviewIssues, []);
     assert.deepEqual(completedRuns, []);
+  });
+
+  it("marks the run failed when processing errors after run creation", async () => {
+    const { completedRuns, createdRunFundIds, failedRuns, service } = buildService(fund, {
+      failIssueCreation: true,
+    });
+
+    const run = await service.startRun("fund-1");
+
+    assert.equal(run?.status, "failed");
+    assert.deepEqual(createdRunFundIds, ["fund-1"]);
+    assert.deepEqual(completedRuns, []);
+    assert.deepEqual(failedRuns, [
+      {
+        runId: "run-1",
+        errorMessage: "issue insert failed",
+      },
+    ]);
   });
 });
