@@ -5,8 +5,26 @@ import { registerTransactionRoutes } from "./transactions/transaction.routes";
 import { registerReconciliationRunRoutes } from "./runs/reconciliation-run.routes";
 import { registerReviewIssueRoutes } from "./issues/review-issue.routes";
 import { registerIssueEventRoutes } from "./events/issue-events.routes";
+import { InMemoryRateLimiter } from "../../shared/rate-limit/in-memory-rate-limiter";
+
+const tallymarkGlobalRateLimiter = new InMemoryRateLimiter(100, 15 * 60 * 1000);
 
 export async function registerTallymarkRoutes(app: FastifyInstance) {
+  app.addHook("onRequest", async (request, reply) => {
+    if (request.method === "GET") {
+      return;
+    }
+    const globalRateLimit = tallymarkGlobalRateLimiter.check(`tallymark:global:${request.ip}`);
+
+    if (!globalRateLimit.allowed) {
+      return reply.code(429).header("Retry-After", globalRateLimit.retryAfterSeconds).send({
+        error: "Too Many Requests",
+        code: "TALLYMARK_RATE_LIMIT_EXCEEDED",
+        message: "Too many Tallymark requests. Please try again later.",
+      });
+    }
+  });
+
   app.register(registerFundRoutes);
   app.register(registerInvestorRoutes);
   app.register(registerTransactionRoutes);

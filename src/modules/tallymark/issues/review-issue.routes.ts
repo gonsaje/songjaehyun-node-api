@@ -10,12 +10,14 @@ import {
   reviewIssueParamsSchema,
   reviewIssueSchema,
 } from "../openapi.schemas";
+import { InMemoryRateLimiter } from "../../../shared/rate-limit/in-memory-rate-limiter";
 
 const reviewIssueRepository = new ReviewIssueRepository();
 const issueEventRepository = new IssueEventRepository();
 
 const reviewIssueService = new ReviewIssueService(reviewIssueRepository, issueEventRepository);
 const allowedReviewIssueUpdateStatuses = ["resolved", "dismissed"] as const;
+const reviewIssueRateLimiter = new InMemoryRateLimiter(10, 5 * 60 * 1000);
 
 export async function registerReviewIssueRoutes(app: FastifyInstance) {
   app.get(
@@ -119,12 +121,29 @@ export async function registerReviewIssueRoutes(app: FastifyInstance) {
           200: reviewIssueSchema,
           400: errorResponseSchema,
           404: errorResponseSchema,
+          429: errorResponseSchema,
         },
       },
     },
     async (request, reply) => {
       const params = request.params as { reviewIssueId: string };
       const body = request.body as Partial<UpdateReviewIssueStatusInput>;
+
+      const rateLimit = reviewIssueRateLimiter.check(
+        `tallymark:review-issue:${params.reviewIssueId}`,
+      );
+
+      if (!rateLimit.allowed) {
+        return reply
+          .status(429)
+          .header("Retry-After", String(rateLimit.retryAfterSeconds ?? 60))
+          .send({
+            error: {
+              code: "TOO_MANY_ISSUE_UPDATES",
+              message: "Too many updates made for this issue. Try again later.",
+            },
+          });
+      }
 
       if (
         !body.status ||

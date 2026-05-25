@@ -11,6 +11,7 @@ import {
   reconciliationRunParamsSchema,
   reconciliationRunSchema,
 } from "../openapi.schemas";
+import { InMemoryRateLimiter } from "../../../shared/rate-limit/in-memory-rate-limiter";
 
 const fundRepository = new FundRepository();
 const reconciliationRunRepository = new ReconciliationRunRepository();
@@ -24,6 +25,7 @@ const reconciliationRunService = new ReconciliationRunService(
   reviewIssueRepository,
   aiSummaryService,
 );
+const reconciliationRunRateLimiter = new InMemoryRateLimiter(3, 5 * 60 * 1000);
 
 export async function registerReconciliationRunRoutes(app: FastifyInstance) {
   app.get(
@@ -91,11 +93,27 @@ export async function registerReconciliationRunRoutes(app: FastifyInstance) {
         response: {
           201: reconciliationRunSchema,
           404: errorResponseSchema,
+          429: errorResponseSchema,
         },
       },
     },
     async (request, reply) => {
       const params = request.params as { fundId: string };
+      const rateLimit = reconciliationRunRateLimiter.check(
+        `tallymark:reconciliation-run:${params.fundId}`,
+      );
+
+      if (!rateLimit.allowed) {
+        return reply
+          .status(429)
+          .header("Retry-After", String(rateLimit.retryAfterSeconds ?? 60))
+          .send({
+            error: {
+              code: "TOO_MANY_RECONCILIATION_RUNS",
+              message: "Too many reconciliation runs started for this fund. Try again later.",
+            },
+          });
+      }
 
       const run = await reconciliationRunService.startRun(params.fundId);
 
