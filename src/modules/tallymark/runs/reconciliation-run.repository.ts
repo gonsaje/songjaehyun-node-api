@@ -41,6 +41,36 @@ export class ReconciliationRunRepository {
     return result.rows[0];
   }
 
+  async createQueuedRun(fundId: string): Promise<ReconciliationRun> {
+    const result = await db.query(
+      `
+        insert into reconciliation_runs (
+          fund_id,
+          status,
+          started_at,
+          completed_at,
+          ai_summary,
+          error_message,
+          metadata
+        )
+        values (
+          $1,
+          'queued',
+          null,
+          null,
+          null,
+          null,
+          '{}'::jsonb
+        )
+        returning
+          ${RECONCILIATION_RUN_COLUMNS}
+      `,
+      [fundId],
+    );
+
+    return result.rows[0];
+  }
+
   async createProcessingRun(fundId: string): Promise<ReconciliationRun> {
     const result = await db.query(
       `
@@ -68,6 +98,23 @@ export class ReconciliationRunRepository {
       [fundId],
     );
 
+    return result.rows[0];
+  }
+
+  async markProcessingRun(reconciliationRunId: string): Promise<ReconciliationRun> {
+    const result = await db.query(
+      `
+      update reconciliation_runs
+      set
+        status = 'processing',
+        started_at = now(),
+        updated_at = now()
+      where id = $1
+      returning 
+        ${RECONCILIATION_RUN_COLUMNS}
+      `,
+      [reconciliationRunId],
+    );
     return result.rows[0];
   }
 

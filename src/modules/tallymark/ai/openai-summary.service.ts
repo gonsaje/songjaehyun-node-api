@@ -23,6 +23,10 @@ export class OpenAiSummaryService implements AiSummaryService {
       return "Reconciliation completed with no review issues.";
     }
 
+    if (process.env.OPENAI_SUMMARY_ENABLED === "false") {
+      return this.buildFallbackSummary(input);
+    }
+
     try {
       const response = await this.client.responses.create({
         model: this.model,

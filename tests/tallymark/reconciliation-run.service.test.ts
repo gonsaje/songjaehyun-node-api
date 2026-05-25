@@ -11,7 +11,10 @@ import type { FundRepository } from "../../src/modules/tallymark/funds/fund.repo
 import type { ReviewIssueRepository } from "../../src/modules/tallymark/issues/review-issue.repository";
 import type { ReconciliationRunRepository } from "../../src/modules/tallymark/runs/reconciliation-run.repository";
 import type { TransactionRepository } from "../../src/modules/tallymark/transactions/transaction.repository";
-import { ReconciliationRunService } from "../../src/modules/tallymark/runs/reconciliation-run.service";
+import {
+  ReconciliationRunJobDispatcher,
+  ReconciliationRunService,
+} from "../../src/modules/tallymark/runs/reconciliation-run.service";
 
 const fund: Fund = {
   id: "fund-1",
@@ -24,17 +27,32 @@ const fund: Fund = {
   updatedAt: "2026-05-22T00:00:00.000Z",
 };
 
-const processingRun: ReconciliationRun = {
+const queuedRun: ReconciliationRun = {
   id: "run-1",
   fundId: "fund-1",
-  status: "processing",
-  startedAt: "2026-05-22T00:00:00.000Z",
+  status: "queued",
+  startedAt: null,
   completedAt: null,
   aiSummary: null,
   errorMessage: null,
   metadata: {},
   createdAt: "2026-05-22T00:00:00.000Z",
   updatedAt: "2026-05-22T00:00:00.000Z",
+};
+
+const processingRun: ReconciliationRun = {
+  ...queuedRun,
+  status: "processing",
+  startedAt: "2026-05-22T00:00:30.000Z",
+  updatedAt: "2026-05-22T00:00:30.000Z",
+};
+
+const completedRun: ReconciliationRun = {
+  ...processingRun,
+  status: "completed",
+  completedAt: "2026-05-22T00:01:00.000Z",
+  aiSummary: "Existing completed summary.",
+  updatedAt: "2026-05-22T00:01:00.000Z",
 };
 
 const transactionWithoutSettlementDate: Transaction = {
@@ -114,13 +132,15 @@ const overpaymentTransaction: Transaction = {
 
 function buildService(
   existingFund: Fund | undefined,
-  options: { failIssueCreation?: boolean } = {},
+  options: { existingRun?: ReconciliationRun | null; failIssueCreation?: boolean } = {},
 ) {
-  const createdRunFundIds: string[] = [];
+  const queuedRunFundIds: string[] = [];
+  const processingRunIds: string[] = [];
   const completedRuns: Array<{ runId: string; aiSummary: string }> = [];
   const failedRuns: Array<{ runId: string; errorMessage: string }> = [];
   const createdReviewIssues: ReviewIssue[] = [];
   const summaryRequests: Array<{ fundName: string; runId: string; issues: ReviewIssue[] }> = [];
+  const dispatchedJobs: Array<{ reconciliationRunId: string }> = [];
 
   const fundRepository = {
     async getFundById() {
@@ -129,8 +149,15 @@ function buildService(
   } as unknown as FundRepository;
 
   const reconciliationRunRepository = {
-    async createProcessingRun(fundId: string) {
-      createdRunFundIds.push(fundId);
+    async createQueuedRun(fundId: string) {
+      queuedRunFundIds.push(fundId);
+      return queuedRun;
+    },
+    async getReconciliationRunById() {
+      return options.existingRun === null ? undefined : (options.existingRun ?? queuedRun);
+    },
+    async markProcessingRun(reconciliationRunId: string) {
+      processingRunIds.push(reconciliationRunId);
       return processingRun;
     },
     async markRunCompleted(runId: string, aiSummary: string) {
@@ -209,31 +236,71 @@ function buildService(
     },
   } as unknown as AiSummaryService;
 
+  const jobDispatcher = {
+    async trigger(payload: { reconciliationRunId: string }) {
+      dispatchedJobs.push(payload);
+    },
+  } as unknown as ReconciliationRunJobDispatcher;
+
   return {
     completedRuns,
     createdReviewIssues,
-    createdRunFundIds,
+    dispatchedJobs,
     failedRuns,
-    summaryRequests,
+    processingRunIds,
+    queuedRunFundIds,
     service: new ReconciliationRunService(
       reconciliationRunRepository,
       fundRepository,
       transactionRepository,
       reviewIssueRepository,
       aiSummaryService,
+      jobDispatcher,
     ),
+    summaryRequests,
   };
 }
 
 describe("ReconciliationRunService", () => {
-  it("creates and completes a reconciliation run for an existing fund", async () => {
-    const { completedRuns, createdReviewIssues, createdRunFundIds, service, summaryRequests } =
+  it("creates a queued reconciliation run and dispatches a processing job", async () => {
+    const { completedRuns, createdReviewIssues, dispatchedJobs, queuedRunFundIds, service } =
       buildService(fund);
 
     const run = await service.startRun("fund-1");
 
+    assert.equal(run?.status, "queued");
+    assert.deepEqual(queuedRunFundIds, ["fund-1"]);
+    assert.deepEqual(dispatchedJobs, [{ reconciliationRunId: "run-1" }]);
+    assert.deepEqual(createdReviewIssues, []);
+    assert.deepEqual(completedRuns, []);
+  });
+
+  it("does not create a queued run for a missing fund", async () => {
+    const { completedRuns, createdReviewIssues, dispatchedJobs, queuedRunFundIds, service } =
+      buildService(undefined);
+
+    const run = await service.startRun("missing-fund");
+
+    assert.equal(run, undefined);
+    assert.deepEqual(queuedRunFundIds, []);
+    assert.deepEqual(dispatchedJobs, []);
+    assert.deepEqual(createdReviewIssues, []);
+    assert.deepEqual(completedRuns, []);
+  });
+
+  it("processes a queued reconciliation run and marks it completed", async () => {
+    const {
+      completedRuns,
+      createdReviewIssues,
+      processingRunIds,
+      service,
+      summaryRequests,
+    } = buildService(fund);
+
+    const run = await service.processRun("run-1");
+
     assert.equal(run?.status, "completed");
-    assert.deepEqual(createdRunFundIds, ["fund-1"]);
+    assert.deepEqual(processingRunIds, ["run-1"]);
     assert.equal(createdReviewIssues.length, 4);
     assert.deepEqual(
       createdReviewIssues.map((issue) => [issue.issueType, issue.transactionId]),
@@ -264,27 +331,37 @@ describe("ReconciliationRunService", () => {
     );
   });
 
-  it("does not create a run for a missing fund", async () => {
-    const { completedRuns, createdReviewIssues, createdRunFundIds, service } =
-      buildService(undefined);
+  it("returns undefined when processing a missing run", async () => {
+    const { service } = buildService(fund, { existingRun: null });
 
-    const run = await service.startRun("missing-fund");
+    const run = await service.processRun("missing-run");
 
     assert.equal(run, undefined);
-    assert.deepEqual(createdRunFundIds, []);
-    assert.deepEqual(createdReviewIssues, []);
-    assert.deepEqual(completedRuns, []);
   });
 
-  it("marks the run failed when processing errors after run creation", async () => {
-    const { completedRuns, createdRunFundIds, failedRuns, service } = buildService(fund, {
+  it("does not reprocess a run that is already completed", async () => {
+    const { completedRuns, createdReviewIssues, failedRuns, processingRunIds, service } =
+      buildService(fund, { existingRun: completedRun });
+
+    const run = await service.processRun("run-1");
+
+    assert.equal(run?.status, "completed");
+    assert.equal(run?.aiSummary, "Existing completed summary.");
+    assert.deepEqual(processingRunIds, []);
+    assert.deepEqual(createdReviewIssues, []);
+    assert.deepEqual(completedRuns, []);
+    assert.deepEqual(failedRuns, []);
+  });
+
+  it("marks the run failed when processing errors", async () => {
+    const { completedRuns, failedRuns, processingRunIds, service } = buildService(fund, {
       failIssueCreation: true,
     });
 
-    const run = await service.startRun("fund-1");
+    const run = await service.processRun("run-1");
 
     assert.equal(run?.status, "failed");
-    assert.deepEqual(createdRunFundIds, ["fund-1"]);
+    assert.deepEqual(processingRunIds, ["run-1"]);
     assert.deepEqual(completedRuns, []);
     assert.deepEqual(failedRuns, [
       {

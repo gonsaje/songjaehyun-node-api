@@ -5,6 +5,7 @@ import { ReconciliationRunService } from "./reconciliation-run.service";
 import { TransactionRepository } from "../transactions/transaction.repository";
 import { ReviewIssueRepository } from "../issues/review-issue.repository";
 import { OpenAiSummaryService } from "../ai/openai-summary.service";
+import { processReconciliationRunTask } from "../../../trigger/reconciliation-run.task";
 import {
   errorResponseSchema,
   fundParamsSchema,
@@ -24,6 +25,7 @@ const reconciliationRunService = new ReconciliationRunService(
   transactionRepository,
   reviewIssueRepository,
   aiSummaryService,
+  processReconciliationRunTask,
 );
 const reconciliationRunRateLimiter = new InMemoryRateLimiter(3, 5 * 60 * 1000);
 
@@ -126,7 +128,11 @@ export async function registerReconciliationRunRoutes(app: FastifyInstance) {
         });
       }
 
-      return reply.status(201).send(run);
+      request.log.info({ runId: run.id, status: run.status }, "Returning reconciliation run");
+
+      return reply.status(201).send({
+        ...run,
+      });
     },
   );
 }
