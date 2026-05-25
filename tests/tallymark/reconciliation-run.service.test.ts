@@ -12,6 +12,7 @@ import type { ReviewIssueRepository } from "../../src/modules/tallymark/issues/r
 import type { ReconciliationRunRepository } from "../../src/modules/tallymark/runs/reconciliation-run.repository";
 import type { TransactionRepository } from "../../src/modules/tallymark/transactions/transaction.repository";
 import {
+  ReconciliationRunJobCanceller,
   ReconciliationRunJobDispatcher,
   ReconciliationRunService,
 } from "../../src/modules/tallymark/runs/reconciliation-run.service";
@@ -33,6 +34,8 @@ const queuedRun: ReconciliationRun = {
   status: "queued",
   startedAt: null,
   completedAt: null,
+  scheduledAt: null,
+  triggerRunId: null,
   aiSummary: null,
   errorMessage: null,
   metadata: {},
@@ -61,6 +64,12 @@ const failedRun: ReconciliationRun = {
   completedAt: "2026-05-22T00:01:00.000Z",
   errorMessage: "Previous processing error.",
   updatedAt: "2026-05-22T00:01:00.000Z",
+};
+
+const scheduledRun: ReconciliationRun = {
+  ...queuedRun,
+  scheduledAt: "2026-05-22T00:10:00.000Z",
+  triggerRunId: "trigger-run-1",
 };
 
 const transactionWithoutSettlementDate: Transaction = {
@@ -153,6 +162,12 @@ function buildService(
   const createdReviewIssues: ReviewIssue[] = [];
   const summaryRequests: Array<{ fundName: string; runId: string; issues: ReviewIssue[] }> = [];
   const dispatchedJobs: Array<{ reconciliationRunId: string }> = [];
+  const cancelledTriggerRunIds: string[] = [];
+  const runsById = new Map<string, ReconciliationRun>();
+  const scheduledJobs: Array<{
+    payload: { reconciliationRunId: string };
+    options?: { delay?: string | Date; ttl?: string | number };
+  }> = [];
 
   const fundRepository = {
     async getFundById(fundId: string) {
@@ -167,11 +182,26 @@ function buildService(
   const reconciliationRunRepository = {
     async createQueuedRun(fundId: string) {
       queuedRunFundIds.push(fundId);
-      return {
+      const run = {
         ...queuedRun,
         id: `run-${queuedRunFundIds.length}`,
         fundId,
       };
+
+      runsById.set(run.id, run);
+      return run;
+    },
+    async createScheduledRun(fundId: string, scheduledAt: string) {
+      queuedRunFundIds.push(fundId);
+      const run = {
+        ...queuedRun,
+        id: `run-${queuedRunFundIds.length}`,
+        fundId,
+        scheduledAt,
+      };
+
+      runsById.set(run.id, run);
+      return run;
     },
     async getReconciliationRunById() {
       return options.existingRun === null ? undefined : (options.existingRun ?? queuedRun);
@@ -179,6 +209,25 @@ function buildService(
     async markProcessingRun(reconciliationRunId: string) {
       processingRunIds.push(reconciliationRunId);
       return processingRun;
+    },
+    async markTriggerRunId(runId: string, triggerRunId: string) {
+      const existingRun = runsById.get(runId) ?? queuedRun;
+
+      return {
+        ...existingRun,
+        id: runId,
+        triggerRunId,
+      };
+    },
+    async markRunCancelled(runId: string) {
+      const existingRun = runsById.get(runId) ?? options.existingRun ?? queuedRun;
+
+      return {
+        ...existingRun,
+        id: runId,
+        status: "cancelled",
+        completedAt: "2026-05-22T00:01:00.000Z",
+      } satisfies ReconciliationRun;
     },
     async markRunCompleted(runId: string, aiSummary: string) {
       completedRuns.push({ runId, aiSummary });
@@ -257,18 +306,31 @@ function buildService(
   } as unknown as AiSummaryService;
 
   const jobDispatcher = {
-    async trigger(payload: { reconciliationRunId: string }) {
+    async trigger(
+      payload: { reconciliationRunId: string },
+      options?: { delay?: string | Date; ttl?: string | number },
+    ) {
       dispatchedJobs.push(payload);
+      scheduledJobs.push({ payload, options });
+      return { id: `trigger-${payload.reconciliationRunId}` };
     },
   } as unknown as ReconciliationRunJobDispatcher;
 
+  const jobCanceller = {
+    async cancel(triggerRunId: string) {
+      cancelledTriggerRunIds.push(triggerRunId);
+    },
+  } as unknown as ReconciliationRunJobCanceller;
+
   return {
+    cancelledTriggerRunIds,
     completedRuns,
     createdReviewIssues,
     dispatchedJobs,
     failedRuns,
     processingRunIds,
     queuedRunFundIds,
+    scheduledJobs,
     service: new ReconciliationRunService(
       reconciliationRunRepository,
       fundRepository,
@@ -276,6 +338,7 @@ function buildService(
       reviewIssueRepository,
       aiSummaryService,
       jobDispatcher,
+      jobCanceller,
     ),
     summaryRequests,
   };
@@ -350,6 +413,93 @@ describe("ReconciliationRunService", () => {
     assert.equal(runs, undefined);
     assert.deepEqual(queuedRunFundIds, []);
     assert.deepEqual(dispatchedJobs, []);
+  });
+
+  it("schedules a reconciliation run for a future date", async () => {
+    const { queuedRunFundIds, scheduledJobs, service } = buildService(fund);
+    const scheduledAt = new Date(Date.now() + 60_000).toISOString();
+
+    const run = await service.scheduleRun("fund-1", scheduledAt);
+
+    assert.equal(run?.status, "queued");
+    assert.equal(run?.scheduledAt, scheduledAt);
+    assert.equal(run?.triggerRunId, "trigger-run-1");
+    assert.deepEqual(queuedRunFundIds, ["fund-1"]);
+    assert.deepEqual(scheduledJobs.length, 1);
+    assert.deepEqual(scheduledJobs[0].payload, { reconciliationRunId: "run-1" });
+    assert.ok(scheduledJobs[0].options?.delay instanceof Date);
+    assert.equal(scheduledJobs[0].options.delay.toISOString(), scheduledAt);
+    assert.equal(scheduledJobs[0].options.ttl, "1h");
+  });
+
+  it("does not schedule a reconciliation run for a missing fund", async () => {
+    const { queuedRunFundIds, scheduledJobs, service } = buildService(undefined);
+    const scheduledAt = new Date(Date.now() + 60_000).toISOString();
+
+    const run = await service.scheduleRun("missing-fund", scheduledAt);
+
+    assert.equal(run, undefined);
+    assert.deepEqual(queuedRunFundIds, []);
+    assert.deepEqual(scheduledJobs, []);
+  });
+
+  it("rejects an invalid scheduled date", async () => {
+    const { queuedRunFundIds, scheduledJobs, service } = buildService(fund);
+
+    await assert.rejects(
+      () => service.scheduleRun("fund-1", "not-a-date"),
+      /scheduledAt must be a valid date-time/,
+    );
+
+    assert.deepEqual(queuedRunFundIds, []);
+    assert.deepEqual(scheduledJobs, []);
+  });
+
+  it("rejects a scheduled date in the past", async () => {
+    const { queuedRunFundIds, scheduledJobs, service } = buildService(fund);
+    const scheduledAt = new Date(Date.now() - 60_000).toISOString();
+
+    await assert.rejects(
+      () => service.scheduleRun("fund-1", scheduledAt),
+      /scheduledAt must be in the future/,
+    );
+
+    assert.deepEqual(queuedRunFundIds, []);
+    assert.deepEqual(scheduledJobs, []);
+  });
+
+  it("cancels a queued scheduled reconciliation run", async () => {
+    const { cancelledTriggerRunIds, service } = buildService(fund, {
+      existingRun: scheduledRun,
+    });
+
+    const run = await service.cancelRun("run-1");
+
+    assert.equal(run?.status, "cancelled");
+    assert.deepEqual(cancelledTriggerRunIds, ["trigger-run-1"]);
+  });
+
+  it("returns undefined when cancelling a missing reconciliation run", async () => {
+    const { cancelledTriggerRunIds, service } = buildService(fund, {
+      existingRun: null,
+    });
+
+    const run = await service.cancelRun("missing-run");
+
+    assert.equal(run, undefined);
+    assert.deepEqual(cancelledTriggerRunIds, []);
+  });
+
+  it("rejects cancellation for a completed reconciliation run", async () => {
+    const { cancelledTriggerRunIds, service } = buildService(fund, {
+      existingRun: completedRun,
+    });
+
+    await assert.rejects(
+      () => service.cancelRun("run-1"),
+      /Only queued reconciliation runs can be cancelled/,
+    );
+    assert.deepEqual(cancelledTriggerRunIds, []);
   });
 
   it("processes a queued reconciliation run and marks it completed", async () => {

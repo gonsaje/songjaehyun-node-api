@@ -7,7 +7,14 @@ import type { AiSummaryService } from "../ai/ai-summary.types";
 import { runReconciliationChecks } from "../workflows/reconciliation/run-reconciliation-checks";
 
 export interface ReconciliationRunJobDispatcher {
-  trigger(payload: { reconciliationRunId: string }): Promise<unknown>;
+  trigger(
+    payload: { reconciliationRunId: string },
+    options?: { delay?: string | Date; ttl?: string | number },
+  ): Promise<{ id: string }>;
+}
+
+export interface ReconciliationRunJobCanceller {
+  cancel(triggerRunId: string): Promise<unknown>;
 }
 
 export class ReconciliationRunService {
@@ -18,6 +25,7 @@ export class ReconciliationRunService {
     private readonly reviewIssueRepository: ReviewIssueRepository,
     private readonly aiSummaryService: AiSummaryService,
     private readonly jobDispatcher?: ReconciliationRunJobDispatcher,
+    private readonly jobCanceller?: ReconciliationRunJobCanceller,
   ) {}
 
   async startRun(fundId: string): Promise<ReconciliationRun | undefined> {
@@ -60,6 +68,40 @@ export class ReconciliationRunService {
     }
 
     return runs;
+  }
+
+  async scheduleRun(fundId: string, scheduledAt: string): Promise<ReconciliationRun | undefined> {
+    const fund = await this.fundRepository.getFundById(fundId);
+
+    if (!fund) {
+      return undefined;
+    }
+
+    const scheduledDate = new Date(scheduledAt);
+
+    if (Number.isNaN(scheduledDate.getTime())) {
+      throw new Error("scheduledAt must be a valid date-time.");
+    }
+
+    if (scheduledDate <= new Date()) {
+      throw new Error("scheduledAt must be in the future.");
+    }
+
+    const scheduledRun = await this.reconciliationRunRepository.createScheduledRun(
+      fundId,
+      scheduledDate.toISOString(),
+    );
+
+    const triggerRun = await this.jobDispatcher?.trigger(
+      { reconciliationRunId: scheduledRun.id },
+      { delay: scheduledDate, ttl: "1h" },
+    );
+
+    if (!triggerRun) {
+      return scheduledRun;
+    }
+
+    return this.reconciliationRunRepository.markTriggerRunId(scheduledRun.id, triggerRun.id);
   }
 
   async processRun(reconciliationRunId: string): Promise<ReconciliationRun | undefined> {
@@ -105,5 +147,24 @@ export class ReconciliationRunService {
 
       throw error;
     }
+  }
+
+  async cancelRun(reconciliationRunId: string): Promise<ReconciliationRun | undefined> {
+    const run =
+      await this.reconciliationRunRepository.getReconciliationRunById(reconciliationRunId);
+
+    if (!run) {
+      return undefined;
+    }
+
+    if (run.status !== "queued") {
+      throw new Error("Only queued reconciliation runs can be cancelled.");
+    }
+
+    if (run.triggerRunId) {
+      await this.jobCanceller?.cancel(run.triggerRunId);
+    }
+
+    return this.reconciliationRunRepository.markRunCancelled(run.id);
   }
 }

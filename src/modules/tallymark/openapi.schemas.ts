@@ -18,9 +18,14 @@ export const reconciliationRunSchema = {
   properties: {
     id: { type: "string", format: "uuid" },
     fundId: { type: "string", format: "uuid" },
-    status: { type: "string", enum: ["queued", "processing", "completed", "failed"] },
+    status: {
+      type: "string",
+      enum: ["queued", "processing", "completed", "failed", "cancelled"],
+    },
     startedAt: { type: "string", nullable: true },
     completedAt: { type: "string", nullable: true },
+    scheduledAt: { type: "string", nullable: true },
+    triggerRunId: { type: "string", nullable: true },
     aiSummary: { type: "string", nullable: true },
     errorMessage: { type: "string", nullable: true },
     metadata: { type: "object", additionalProperties: true },
@@ -33,6 +38,8 @@ export const reconciliationRunSchema = {
     "status",
     "startedAt",
     "completedAt",
+    "scheduledAt",
+    "triggerRunId",
     "aiSummary",
     "errorMessage",
     "metadata",
@@ -62,6 +69,14 @@ export const batchReconciliationRunResponseSchema = {
     },
   },
   required: ["runs"],
+} as const;
+
+export const scheduledReconciliationRunBodySchema = {
+  type: "object",
+  properties: {
+    scheduledAt: { type: "string", format: "date-time" },
+  },
+  required: ["scheduledAt"],
 } as const;
 
 export const reviewIssueSchema = {

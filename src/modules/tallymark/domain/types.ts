@@ -1,4 +1,9 @@
-export type ReconciliationRunStatus = "queued" | "processing" | "completed" | "failed";
+export type ReconciliationRunStatus =
+  | "queued"
+  | "processing"
+  | "completed"
+  | "failed"
+  | "cancelled";
 
 export type ReviewIssueStatus = "open" | "resolved" | "dismissed";
 
@@ -65,6 +70,8 @@ export interface ReconciliationRun {
   status: ReconciliationRunStatus;
   startedAt: string | null;
   completedAt: string | null;
+  scheduledAt: string | null;
+  triggerRunId: string | null;
   aiSummary: string | null;
   errorMessage: string | null;
   metadata: Record<string, unknown>;
