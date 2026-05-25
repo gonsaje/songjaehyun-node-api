@@ -8,20 +8,24 @@ import { registerIssueEventRoutes } from "./events/issue-events.routes";
 import { InMemoryRateLimiter } from "../../shared/rate-limit/in-memory-rate-limiter";
 
 const tallymarkGlobalRateLimiter = new InMemoryRateLimiter(100, 15 * 60 * 1000);
-
+const rateLimitedMethods = new Set(["POST", "PATCH", "PUT", "DELETE"]);
 export async function registerTallymarkRoutes(app: FastifyInstance) {
   app.addHook("onRequest", async (request, reply) => {
-    if (request.method === "GET") {
+    if (!rateLimitedMethods.has(request.method)) {
       return;
     }
     const globalRateLimit = tallymarkGlobalRateLimiter.check(`tallymark:global:${request.ip}`);
 
     if (!globalRateLimit.allowed) {
-      return reply.code(429).header("Retry-After", globalRateLimit.retryAfterSeconds).send({
-        error: "Too Many Requests",
-        code: "TALLYMARK_RATE_LIMIT_EXCEEDED",
-        message: "Too many Tallymark requests. Please try again later.",
-      });
+      return reply
+        .code(429)
+        .header("Retry-After", String(globalRateLimit.retryAfterSeconds ?? 60))
+        .send({
+          error: {
+            code: "TALLYMARK_RATE_LIMIT_EXCEEDED",
+            message: "Too many Tallymark requests. Please try again later.",
+          },
+        });
     }
   });
 
