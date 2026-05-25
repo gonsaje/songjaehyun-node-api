@@ -53,6 +53,97 @@ Stateful Systems       Validation
 
 ```
 
+---
+
+# Deployment
+
+This service is deployed in two parts:
+
+- The Fastify API runs as a Docker container on AWS ECS Fargate.
+- Trigger.dev tasks in `src/trigger` are deployed to Trigger.dev Cloud.
+
+The GitHub Actions workflow in `.github/workflows/deploy.yml` deploys both targets on pushes to `main` and can also be run manually from the Actions tab.
+
+## Required GitHub Secrets
+
+Set these in `Settings -> Secrets and variables -> Actions -> Secrets`.
+
+| Secret                 | Purpose                                                                              |
+| ---------------------- | ------------------------------------------------------------------------------------ |
+| `AWS_ROLE_TO_ASSUME`   | IAM role ARN that GitHub Actions assumes through OIDC to push to ECR and update ECS. |
+| `TRIGGER_ACCESS_TOKEN` | Trigger.dev personal access token used by CI to deploy tasks.                        |
+
+## Required GitHub Variables
+
+Set these in `Settings -> Secrets and variables -> Actions -> Variables`.
+
+| Variable                     | Purpose                                                                          |
+| ---------------------------- | -------------------------------------------------------------------------------- |
+| `AWS_REGION`                 | AWS region for ECR and ECS, for example `us-east-1`.                             |
+| `ECR_REPOSITORY`             | ECR repository name for the API Docker image.                                    |
+| `ECS_CLUSTER`                | ECS cluster name.                                                                |
+| `ECS_SERVICE`                | ECS service name.                                                                |
+| `ECS_TASK_DEFINITION_FAMILY` | Existing ECS task definition family to use as the deployment template.           |
+| `ECS_CONTAINER_NAME`         | Container name inside the ECS task definition that should receive the new image. |
+
+## Runtime Environment Variables
+
+The GitHub workflow only deploys code. Runtime secrets must be configured separately:
+
+- ECS task definition/secrets should include the API runtime values such as database, OpenAI, Trigger.dev, and CORS configuration.
+- Trigger.dev environment variables should include the values needed by tasks, such as database and OpenAI configuration.
+
+At minimum, configure these runtime values in both ECS and Trigger.dev:
+
+| Variable                 | Purpose                                                     |
+| ------------------------ | ----------------------------------------------------------- |
+| `DATABASE_URL`           | Supabase Postgres connection string with `sslmode=require`. |
+| `OPENAI_API_KEY`         | OpenAI API key for AI summaries.                            |
+| `OPENAI_MODEL`           | Optional model override. Defaults to `gpt-5-mini`.          |
+| `OPENAI_SUMMARY_ENABLED` | Optional flag. Set to `false` to disable AI summaries.      |
+
+Configure this runtime value in ECS:
+
+| Variable             | Purpose                                                |
+| -------------------- | ------------------------------------------------------ |
+| `TRIGGER_SECRET_KEY` | Trigger.dev secret key used by the API to invoke jobs. |
+
+## Supabase Database Setup
+
+Local `.env` values are not available inside ECS or Trigger.dev. Production must use a Supabase Postgres connection string in each runtime environment.
+
+Use the Supabase pooler connection string for deployed workloads:
+
+```text
+postgresql://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.com:6543/postgres?sslmode=require
+```
+
+In Supabase:
+
+1. Open the project dashboard.
+2. Go to `Project Settings -> Database -> Connection string`.
+3. Choose the pooler connection string.
+4. Replace the password placeholder.
+5. Ensure the final URL includes `sslmode=require`.
+
+Apply database SQL before deploying the app:
+
+1. Open Supabase `SQL Editor`.
+2. Run each file in order from `db/migrations`.
+3. Optionally run `db/seeds/001_seed_tallymark_demo.sql` for demo data.
+
+The current migration files are raw SQL and do not use a migration tracking table yet, so apply them deliberately and only once per database unless a file is written to be idempotent.
+
+Trigger.dev deploys are run with:
+
+```bash
+npm run deploy:trigger-prod
+```
+
+ECS deploys build the Docker image, push it to ECR with the commit SHA as the tag, render a new task definition revision, and update the ECS service.
+
+---
+
 ### Java Backend
 
 Provides interactive demos for backend systems concepts:

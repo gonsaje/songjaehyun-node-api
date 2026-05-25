@@ -7,6 +7,7 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
+    "deploy:trigger-prod": "trigger deploy --env prod",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
@@ -32,6 +33,7 @@
     "@types/pg": "^8.20.0",
     "eslint": "^10.0.3",
     "prettier": "^3.8.1",
+    "trigger.dev": "4.4.6",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   }
