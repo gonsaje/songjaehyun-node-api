@@ -43,7 +43,7 @@ export class ReconciliationRunService {
       return undefined;
     }
 
-    if (run.status !== "queued") {
+    if (run.status === "completed" || run.status === "processing") {
       return run;
     }
 
@@ -72,10 +72,12 @@ export class ReconciliationRunService {
 
       return this.reconciliationRunRepository.markRunCompleted(processingRun.id, aiSummary);
     } catch (error) {
-      return this.reconciliationRunRepository.markRunFailed(
+      await this.reconciliationRunRepository.markRunFailed(
         run.id,
         error instanceof Error ? error.message : "Unknown reconciliation error",
       );
+
+      throw error;
     }
   }
 }

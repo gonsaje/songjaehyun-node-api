@@ -55,6 +55,14 @@ const completedRun: ReconciliationRun = {
   updatedAt: "2026-05-22T00:01:00.000Z",
 };
 
+const failedRun: ReconciliationRun = {
+  ...processingRun,
+  status: "failed",
+  completedAt: "2026-05-22T00:01:00.000Z",
+  errorMessage: "Previous processing error.",
+  updatedAt: "2026-05-22T00:01:00.000Z",
+};
+
 const transactionWithoutSettlementDate: Transaction = {
   id: "transaction-1",
   fundId: "fund-1",
@@ -353,14 +361,31 @@ describe("ReconciliationRunService", () => {
     assert.deepEqual(failedRuns, []);
   });
 
-  it("marks the run failed when processing errors", async () => {
+  it("reprocesses a failed run so Trigger.dev retries can recover", async () => {
     const { completedRuns, failedRuns, processingRunIds, service } = buildService(fund, {
-      failIssueCreation: true,
+      existingRun: failedRun,
     });
 
     const run = await service.processRun("run-1");
 
-    assert.equal(run?.status, "failed");
+    assert.equal(run?.status, "completed");
+    assert.deepEqual(processingRunIds, ["run-1"]);
+    assert.deepEqual(failedRuns, []);
+    assert.deepEqual(completedRuns, [
+      {
+        runId: "run-1",
+        aiSummary: "AI summary for 4 issue(s).",
+      },
+    ]);
+  });
+
+  it("marks the run failed and rethrows when processing errors", async () => {
+    const { completedRuns, failedRuns, processingRunIds, service } = buildService(fund, {
+      failIssueCreation: true,
+    });
+
+    await assert.rejects(() => service.processRun("run-1"), /issue insert failed/);
+
     assert.deepEqual(processingRunIds, ["run-1"]);
     assert.deepEqual(completedRuns, []);
     assert.deepEqual(failedRuns, [
