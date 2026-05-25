@@ -36,6 +36,32 @@ export class ReconciliationRunService {
     return { ...run };
   }
 
+  async startRuns(fundIds: string[]): Promise<ReconciliationRun[] | undefined> {
+    const uniqueFundIds = [...new Set(fundIds)];
+
+    for (const fundId of uniqueFundIds) {
+      const fund = await this.fundRepository.getFundById(fundId);
+
+      if (!fund) {
+        return undefined;
+      }
+    }
+
+    const runs: ReconciliationRun[] = [];
+
+    for (const fundId of uniqueFundIds) {
+      const run = await this.reconciliationRunRepository.createQueuedRun(fundId);
+
+      void this.jobDispatcher?.trigger({ reconciliationRunId: run.id }).catch((error) => {
+        console.error("Failed to trigger reconciliation run task", error);
+      });
+
+      runs.push({ ...run });
+    }
+
+    return runs;
+  }
+
   async processRun(reconciliationRunId: string): Promise<ReconciliationRun | undefined> {
     const run =
       await this.reconciliationRunRepository.getReconciliationRunById(reconciliationRunId);

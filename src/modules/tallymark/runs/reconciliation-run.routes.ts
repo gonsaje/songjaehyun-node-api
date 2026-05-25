@@ -7,6 +7,8 @@ import { ReviewIssueRepository } from "../issues/review-issue.repository";
 import { OpenAiSummaryService } from "../ai/openai-summary.service";
 import { processReconciliationRunTask } from "../../../trigger/reconciliation-run.task";
 import {
+  batchReconciliationRunBodySchema,
+  batchReconciliationRunResponseSchema,
   errorResponseSchema,
   fundParamsSchema,
   reconciliationRunParamsSchema,
@@ -133,6 +135,52 @@ export async function registerReconciliationRunRoutes(app: FastifyInstance) {
       return reply.status(201).send({
         ...run,
       });
+    },
+  );
+
+  app.post(
+    "/api/tallymark/reconciliation-runs/batch",
+    {
+      schema: {
+        tags: ["Tallymark"],
+        summary: "Start a batch of reconciliation runs for multiple funds",
+        description: "Runs reconciliation checks for multiple funds",
+        body: batchReconciliationRunBodySchema,
+        response: {
+          201: batchReconciliationRunResponseSchema,
+          400: errorResponseSchema,
+          429: errorResponseSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const body = request.body as { fundIds: string[] };
+      const rateLimit = reconciliationRunRateLimiter.check(`tallymark:reconciliation-run:batch`);
+
+      if (!rateLimit.allowed) {
+        return reply
+          .status(429)
+          .header("Retry-After", String(rateLimit.retryAfterSeconds ?? 60))
+          .send({
+            error: {
+              code: "TOO_MANY_RECONCILIATION_RUNS",
+              message: "Too many batch reconciliation runs started for user. Try again later.",
+            },
+          });
+      }
+
+      const runs = await reconciliationRunService.startRuns(body.fundIds);
+
+      if (!runs) {
+        return reply.status(400).send({
+          error: {
+            code: "INVALID_FUND_IDS",
+            message: "One or more fund IDs were not found.",
+          },
+        });
+      }
+
+      return reply.status(201).send({ runs });
     },
   );
 }

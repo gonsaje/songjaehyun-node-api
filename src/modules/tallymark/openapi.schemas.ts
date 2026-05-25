@@ -41,6 +41,29 @@ export const reconciliationRunSchema = {
   ],
 } as const;
 
+export const batchReconciliationRunBodySchema = {
+  type: "object",
+  properties: {
+    fundIds: {
+      type: "array",
+      minItems: 1,
+      items: { type: "string", format: "uuid" },
+    },
+  },
+  required: ["fundIds"],
+} as const;
+
+export const batchReconciliationRunResponseSchema = {
+  type: "object",
+  properties: {
+    runs: {
+      type: "array",
+      items: reconciliationRunSchema,
+    },
+  },
+  required: ["runs"],
+} as const;
+
 export const reviewIssueSchema = {
   type: "object",
   properties: {

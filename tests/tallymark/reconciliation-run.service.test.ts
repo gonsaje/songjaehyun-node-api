@@ -140,7 +140,11 @@ const overpaymentTransaction: Transaction = {
 
 function buildService(
   existingFund: Fund | undefined,
-  options: { existingRun?: ReconciliationRun | null; failIssueCreation?: boolean } = {},
+  options: {
+    existingRun?: ReconciliationRun | null;
+    failIssueCreation?: boolean;
+    missingFundIds?: string[];
+  } = {},
 ) {
   const queuedRunFundIds: string[] = [];
   const processingRunIds: string[] = [];
@@ -151,15 +155,23 @@ function buildService(
   const dispatchedJobs: Array<{ reconciliationRunId: string }> = [];
 
   const fundRepository = {
-    async getFundById() {
-      return existingFund;
+    async getFundById(fundId: string) {
+      if (options.missingFundIds?.includes(fundId)) {
+        return undefined;
+      }
+
+      return existingFund ? { ...existingFund, id: fundId } : undefined;
     },
   } as unknown as FundRepository;
 
   const reconciliationRunRepository = {
     async createQueuedRun(fundId: string) {
       queuedRunFundIds.push(fundId);
-      return queuedRun;
+      return {
+        ...queuedRun,
+        id: `run-${queuedRunFundIds.length}`,
+        fundId,
+      };
     },
     async getReconciliationRunById() {
       return options.existingRun === null ? undefined : (options.existingRun ?? queuedRun);
@@ -294,6 +306,50 @@ describe("ReconciliationRunService", () => {
     assert.deepEqual(dispatchedJobs, []);
     assert.deepEqual(createdReviewIssues, []);
     assert.deepEqual(completedRuns, []);
+  });
+
+  it("creates queued reconciliation runs for a valid batch", async () => {
+    const { dispatchedJobs, queuedRunFundIds, service } = buildService(fund);
+
+    const runs = await service.startRuns(["fund-1", "fund-2"]);
+
+    assert.deepEqual(
+      runs?.map((run) => [run.id, run.fundId, run.status]),
+      [
+        ["run-1", "fund-1", "queued"],
+        ["run-2", "fund-2", "queued"],
+      ],
+    );
+    assert.deepEqual(queuedRunFundIds, ["fund-1", "fund-2"]);
+    assert.deepEqual(dispatchedJobs, [
+      { reconciliationRunId: "run-1" },
+      { reconciliationRunId: "run-2" },
+    ]);
+  });
+
+  it("dedupes fund IDs before starting a batch", async () => {
+    const { dispatchedJobs, queuedRunFundIds, service } = buildService(fund);
+
+    const runs = await service.startRuns(["fund-1", "fund-1", "fund-2"]);
+
+    assert.equal(runs?.length, 2);
+    assert.deepEqual(queuedRunFundIds, ["fund-1", "fund-2"]);
+    assert.deepEqual(dispatchedJobs, [
+      { reconciliationRunId: "run-1" },
+      { reconciliationRunId: "run-2" },
+    ]);
+  });
+
+  it("does not create any queued runs when a batch contains a missing fund", async () => {
+    const { dispatchedJobs, queuedRunFundIds, service } = buildService(fund, {
+      missingFundIds: ["missing-fund"],
+    });
+
+    const runs = await service.startRuns(["fund-1", "missing-fund"]);
+
+    assert.equal(runs, undefined);
+    assert.deepEqual(queuedRunFundIds, []);
+    assert.deepEqual(dispatchedJobs, []);
   });
 
   it("processes a queued reconciliation run and marks it completed", async () => {
