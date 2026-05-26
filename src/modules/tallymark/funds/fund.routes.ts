@@ -8,6 +8,10 @@ export async function registerFundRoutes(app: FastifyInstance) {
     return fundRepository.listFunds();
   });
 
+  app.get("/api/tallymark/funds/summary", async () => {
+    return fundRepository.listFundSummaries();
+  });
+
   app.get("/api/tallymark/funds/:fundId", async (request, reply) => {
     const params = request.params as { fundId: string };
     const fund = await fundRepository.getFundById(params.fundId);

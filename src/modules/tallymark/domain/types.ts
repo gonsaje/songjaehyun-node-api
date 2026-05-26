@@ -39,6 +39,17 @@ export interface Fund {
   updatedAt: string;
 }
 
+export interface FundSummary extends Fund {
+  investorCount: number;
+  transactionCount: number;
+  reconciliationRunCount: number;
+  reviewIssueCount: number;
+  openReviewIssueCount: number;
+  criticalReviewIssueCount: number;
+  latestReconciliationRunStatus: ReconciliationRunStatus | null;
+  latestReconciliationRunCreatedAt: string | null;
+}
+
 export interface Investor {
   id: string;
   fundId: string;
@@ -47,6 +58,18 @@ export interface Investor {
   metadata: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface InvestorSummary extends Investor {
+  fundName: string;
+  transactionCount: number;
+  capitalCallCount: number;
+  distributionCount: number;
+  totalTransactionAmount: string;
+  reviewIssueCount: number;
+  openReviewIssueCount: number;
+  criticalReviewIssueCount: number;
+  latestTransactionDate: string | null;
 }
 
 export interface Transaction {
