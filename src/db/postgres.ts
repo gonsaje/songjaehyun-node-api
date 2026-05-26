@@ -1,11 +1,23 @@
 import { Pool } from "pg";
 
-const connectionString = process.env.DATABASE_URL;
+let pool: Pool | undefined;
 
-if (!connectionString) {
-  throw new Error("DATABASE_URL is required");
+function getPool() {
+  const connectionString = process.env.DATABASE_URL;
+
+  if (!connectionString) {
+    throw new Error("DATABASE_URL is required");
+  }
+
+  pool ??= new Pool({
+    connectionString,
+  });
+
+  return pool;
 }
 
-export const db = new Pool({
-  connectionString,
-});
+export const db = {
+  get query() {
+    return getPool().query.bind(getPool());
+  },
+} as Pick<Pool, "query">;
