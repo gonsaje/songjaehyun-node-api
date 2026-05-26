@@ -24,7 +24,7 @@ export async function registerCors(app: FastifyInstance) {
         return;
       }
 
-      callback(new Error("Not allowed by CORS"), false);
+      callback(new Error("Not allowed by CORS."), false);
     },
   });
 }
