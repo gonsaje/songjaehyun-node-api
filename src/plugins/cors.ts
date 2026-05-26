@@ -10,6 +10,8 @@ const allowedOrigins = [
 
 export async function registerCors(app: FastifyInstance) {
   await app.register(cors, {
+    methods: ["GET", "HEAD", "POST", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
     origin: (origin, callback) => {
       // allow server-to-server or curl requests
       if (!origin) {
