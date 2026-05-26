@@ -127,9 +127,17 @@ export class ReconciliationRunService {
         processingRun.fundId,
       );
       const issueInputs = runReconciliationChecks(processingRun.id, transactions);
+      const summarizedIssueInputs = await Promise.all(
+        issueInputs.map(async (issueInput) => ({
+          ...issueInput,
+          aiSummary: await this.aiSummaryService.summarizeReviewIssue(issueInput),
+        })),
+      );
 
       const createdIssues = await Promise.all(
-        issueInputs.map((issueInput) => this.reviewIssueRepository.createReviewIssue(issueInput)),
+        summarizedIssueInputs.map((issueInput) =>
+          this.reviewIssueRepository.createReviewIssue(issueInput),
+        ),
       );
 
       const aiSummary = await this.aiSummaryService.summarizeReconciliationRun({

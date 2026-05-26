@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import type { AiSummaryService, ReconciliationSummaryInput } from "./ai-summary.types";
+import type { CreateReviewIssueInput } from "../domain/types";
 
 interface OpenAiResponsesClient {
   responses: {
@@ -73,6 +74,52 @@ export class OpenAiSummaryService implements AiSummaryService {
     }
   }
 
+  async summarizeReviewIssue(input: CreateReviewIssueInput): Promise<string> {
+    if (process.env.OPENAI_SUMMARY_ENABLED === "false") {
+      return this.buildIssueFallbackSummary(input);
+    }
+
+    try {
+      const response = await this.client.responses.create({
+        model: this.model,
+        instructions: [
+          "You are generating an audit-friendly summary for a single deterministic financial reconciliation review issue.",
+          "The audience is a human fund operations reviewer who needs to quickly understand what was flagged and what to verify next.",
+          "",
+          "Use only the issue data provided in the input.",
+          "",
+          "Strict rules:",
+          "- Do not invent or infer missing amounts, investors, transaction references, fund names, dates, causes, or resolutions.",
+          "- Do not say the issue is resolved, approved, waived, dismissed, acceptable, or low risk unless the input explicitly says so.",
+          "- Do not recommend accounting treatment, legal conclusions, or operational decisions.",
+          "- Do not use dramatic language such as fraud, breach, failure, or critical unless present in the input.",
+          "- Do not mention AI, the model, or the prompt.",
+          "",
+          "Output requirements:",
+          "- Write 1 to 2 sentences.",
+          "- Use concise, neutral, audit-friendly language.",
+          "- First, explain what was flagged.",
+          "- Then, explain why it needs review or what specific fact should be checked next.",
+          "- If the next check is unclear from the input, say the reviewer should verify the underlying source records.",
+        ].join("\n"),
+        input: JSON.stringify({
+          issueType: input.issueType,
+          severity: input.severity,
+          title: input.title,
+          description: input.description,
+          metadata: input.metadata,
+        }),
+        max_output_tokens: 180,
+      });
+
+      const summary = response.output_text.trim();
+
+      return summary || this.buildIssueFallbackSummary(input);
+    } catch {
+      return this.buildIssueFallbackSummary(input);
+    }
+  }
+
   private buildFallbackSummary(input: ReconciliationSummaryInput): string {
     const issueCountBySeverity = input.issues.reduce<Record<string, number>>((counts, issue) => {
       counts[issue.severity] = (counts[issue.severity] ?? 0) + 1;
@@ -84,5 +131,9 @@ export class OpenAiSummaryService implements AiSummaryService {
       .join(", ");
 
     return `Reconciliation completed with ${input.issues.length} review issue(s) requiring human review${severitySummary ? `: ${severitySummary}.` : "."}`;
+  }
+
+  private buildIssueFallbackSummary(input: CreateReviewIssueInput): string {
+    return `${input.title} This ${input.severity} severity ${input.issueType.replaceAll("_", " ")} issue requires human review before the reconciliation can be treated as complete.`;
   }
 }

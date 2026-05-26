@@ -1,4 +1,4 @@
-import type { ReviewIssue } from "../domain/types";
+import type { CreateReviewIssueInput, ReviewIssue } from "../domain/types";
 
 export interface ReconciliationSummaryInput {
   fundName: string;
@@ -7,5 +7,6 @@ export interface ReconciliationSummaryInput {
 }
 
 export interface AiSummaryService {
+  summarizeReviewIssue(input: CreateReviewIssueInput): Promise<string>;
   summarizeReconciliationRun(input: ReconciliationSummaryInput): Promise<string>;
 }

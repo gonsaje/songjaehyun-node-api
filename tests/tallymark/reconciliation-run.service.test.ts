@@ -295,6 +295,9 @@ function buildService(
   } as unknown as ReviewIssueRepository;
 
   const aiSummaryService = {
+    async summarizeReviewIssue(input: { title: string }) {
+      return `AI summary for ${input.title}.`;
+    },
     async summarizeReconciliationRun(input: {
       fundName: string;
       runId: string;
@@ -503,13 +506,8 @@ describe("ReconciliationRunService", () => {
   });
 
   it("processes a queued reconciliation run and marks it completed", async () => {
-    const {
-      completedRuns,
-      createdReviewIssues,
-      processingRunIds,
-      service,
-      summaryRequests,
-    } = buildService(fund);
+    const { completedRuns, createdReviewIssues, processingRunIds, service, summaryRequests } =
+      buildService(fund);
 
     const run = await service.processRun("run-1");
 

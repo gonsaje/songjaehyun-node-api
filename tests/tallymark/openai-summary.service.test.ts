@@ -23,6 +23,92 @@ const issue: ReviewIssue = {
 };
 
 describe("OpenAiSummaryService", () => {
+  it("summarizes one review issue with bounded context", async () => {
+    const requests: Array<{
+      model: string;
+      instructions: string;
+      input: string;
+      max_output_tokens: number;
+    }> = [];
+
+    const service = new OpenAiSummaryService(
+      {
+        responses: {
+          async create(request) {
+            requests.push(request);
+            return {
+              output_text:
+                "  This transaction is missing settlement confirmation and should be checked against bank records.  ",
+            };
+          },
+        },
+      },
+      "test-model",
+    );
+
+    const summary = await service.summarizeReviewIssue({
+      reconciliationRunId: issue.reconciliationRunId,
+      fundId: issue.fundId,
+      transactionId: issue.transactionId,
+      investorId: issue.investorId,
+      issueType: issue.issueType,
+      severity: issue.severity,
+      status: issue.status,
+      title: issue.title,
+      description: issue.description,
+      metadata: issue.metadata,
+    });
+
+    assert.equal(
+      summary,
+      "This transaction is missing settlement confirmation and should be checked against bank records.",
+    );
+    assert.equal(requests.length, 1);
+    assert.equal(requests[0].model, "test-model");
+    assert.equal(requests[0].max_output_tokens, 180);
+    assert.match(requests[0].instructions, /Do not approve/);
+    assert.deepEqual(JSON.parse(requests[0].input), {
+      issueType: "missing_settlement_date",
+      severity: "low",
+      title: "Missing settlement date for NS-CC-2024-NO-SETTLE",
+      description: "The transaction has a transaction date but no settlement date.",
+      metadata: {
+        reference: "NS-CC-2024-NO-SETTLE",
+      },
+    });
+  });
+
+  it("returns a deterministic review issue fallback when OpenAI fails", async () => {
+    const service = new OpenAiSummaryService(
+      {
+        responses: {
+          async create() {
+            throw new Error("rate limited");
+          },
+        },
+      },
+      "test-model",
+    );
+
+    const summary = await service.summarizeReviewIssue({
+      reconciliationRunId: issue.reconciliationRunId,
+      fundId: issue.fundId,
+      transactionId: issue.transactionId,
+      investorId: issue.investorId,
+      issueType: issue.issueType,
+      severity: issue.severity,
+      status: issue.status,
+      title: issue.title,
+      description: issue.description,
+      metadata: issue.metadata,
+    });
+
+    assert.equal(
+      summary,
+      "Missing settlement date for NS-CC-2024-NO-SETTLE This low severity missing settlement date issue requires human review before the reconciliation can be treated as complete.",
+    );
+  });
+
   it("returns a fixed summary when there are no review issues", async () => {
     const service = new OpenAiSummaryService(
       {
